@@ -33,7 +33,7 @@ const STEPS = [
   },
   {
     num: '02',
-    phase: 'Kurasi & Verifikasi',
+    phase: 'Produk Pilihan & Verifikasi',
     icon: ClipboardCheck,
     title: 'Admin memverifikasi',
     text: 'Tim admin memeriksa keaslian profil pengrajin. Hanya toko yang disetujui yang dapat menayangkan produk ke publik.',
@@ -131,7 +131,7 @@ export default function About() {
               >
                 PAPEDA — singkatan dari{" "}
                 <strong>Papua Aksesori &amp; Produk Etnik Daerah Asli</strong> —
-                adalah ruang kurasi dan marketplace multi-vendor yang
+                adalah ruang Produk Pilihan dan marketplace multi-vendor yang
                 mempertemukan pengrajin noken, pengukir kayu, serta UMKM budaya
                 Papua dengan apresiator di seluruh Indonesia.
               </motion.p>
@@ -260,7 +260,7 @@ export default function About() {
               <div className="mt-8 grid gap-4 border-t border-cream-300 pt-8 sm:grid-cols-2">
                 <div className="border-l-2 border-charcoal pl-4">
                   <p className="text-xs font-medium uppercase tracking-wider text-charcoal">
-                    Kurasi Terverifikasi
+                    Produk Pilihan Terverifikasi
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-charcoal-500">
                     Setiap pengajuan toko ditinjau secara manual oleh admin
@@ -305,7 +305,7 @@ export default function About() {
                 </h2>
               </div>
               <p className="max-w-md text-xs leading-relaxed text-charcoal-500">
-                Empat tahapan terstruktur mulai dari kurasi pendaftaran toko
+                Empat tahapan terstruktur mulai dari Produk Pilihan pendaftaran toko
                 pengrajin hingga karya tiba di tangan pembeli.
               </p>
             </motion.div>

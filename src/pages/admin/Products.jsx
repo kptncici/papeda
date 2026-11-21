@@ -47,7 +47,7 @@ export default function AdminProducts() {
   return (
     <>
       <PageHeader
-        eyebrow="Kurasi Katalog"
+        eyebrow="Produk Pilihan Katalog"
         title="Produk & moderasi"
         description="Daftar seluruh karya dari semua toko pengrajin. Produk yang diblokir tidak akan tampil di katalog publik."
       />

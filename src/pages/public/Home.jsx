@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight, Compass, HandHeart, ShieldCheck, ShoppingBag, Sparkles, Store, Truck } from 'lucide-react';
 import { useAsync } from '../../hooks/useAsync';
 import { searchProducts, listCategories, listStores } from '../../services/catalog';
@@ -7,18 +8,67 @@ import { ProductTileGrid } from '../../components/ProductCard';
 import { DataState, EmptyState } from '../../components/ui/Feedback';
 import { imageOf, rupiah } from '../../utils/format';
 
+const HERO_INTERVAL_MS = 10000; // lama tiap gambar hero tampil
+const HERO_MAX_SLIDES = 6;
+
+/**
+ * Kalimat judul hero per jenis produk. Aturan dicocokkan dari atas ke bawah terhadap
+ * nama subkategori, nama kategori utama, lalu nama produk. Kata ketiga dicetak tebal.
+ * Untuk mengubah atau menambah kalimat, cukup sunting daftar ini.
+ */
+const HERO_HEADLINES = [
+  { key: 'ukir', match: /ukir|patung|pahat/i, lines: ['Diukir', 'dengan', 'sabar.'] },
+  { key: 'rajut', match: /rajut/i, lines: ['Dirajut', 'dengan', 'tangan.'] },
+  { key: 'anyam', match: /noken|anyam|tikar|keranjang/i, lines: ['Dianyam', 'dengan', 'tangan.'] },
+  { key: 'rangkai', match: /kalung|gelang|anting|manik|aksesoris/i, lines: ['Dirangkai', 'satu per', 'satu.'] },
+  { key: 'busana', match: /kaos|kemeja|jaket|busana|baju|fashion/i, lines: ['Dirancang', 'di tanah', 'Papua.'] },
+  { key: 'kenang', match: /souvenir|cendera|hiasan|gantungan|dekor/i, lines: ['Dibuat', 'untuk', 'dikenang.'] },
+];
+const HERO_DEFAULT_HEADLINE = { key: 'umum', lines: ['Dibuat', 'dengan', 'tangan.'] };
+
+function heroHeadlineFor(product, parentName) {
+  for (const text of [product.category_name, parentName, product.name]) {
+    const found = text && HERO_HEADLINES.find((rule) => rule.match.test(text));
+    if (found) return found;
+  }
+  return HERO_DEFAULT_HEADLINE;
+}
+
+/** Memilih produk hero bergiliran antarjenis supaya kalimat judulnya bervariasi. */
+function buildHeroSlides(products, categories) {
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  const withImage = products.filter((product) => product.image_url);
+  const pool = withImage.length ? withImage : products.slice(0, 1);
+  const groups = new Map();
+  pool.forEach((product) => {
+    const category = byId.get(product.category_id);
+    const parentName = category?.parent_id ? byId.get(category.parent_id)?.name : category?.name;
+    const headline = heroHeadlineFor(product, parentName);
+    if (!groups.has(headline.key)) groups.set(headline.key, []);
+    groups.get(headline.key).push({ product, headline });
+  });
+  const queues = [...groups.values()];
+  const slides = [];
+  while (slides.length < HERO_MAX_SLIDES && queues.some((queue) => queue.length)) {
+    queues.forEach((queue) => { if (queue.length && slides.length < HERO_MAX_SLIDES) slides.push(queue.shift()); });
+  }
+  return slides;
+}
+
 async function loadHome() {
-  const [latest, best, categories, stores] = await Promise.all([
+  const [latest, best, categories, stores, heroPool] = await Promise.all([
     searchProducts({ sort: 'newest', pageSize: 8 }),
     searchProducts({ sort: 'bestseller', pageSize: 4 }),
     listCategories(),
     listStores(6),
+    searchProducts({ sort: 'newest', pageSize: 24 }),
   ]);
   return {
     latest: latest.items,
     best: best.items.filter((p) => p.sold_count > 0),
     categories: categories.filter((c) => !c.parent_id),
     stores,
+    heroSlides: buildHeroSlides(heroPool.items, categories),
   };
 }
 
@@ -57,7 +107,55 @@ function SectionHead({ eyebrow, title, accent, to, linkLabel }) {
  * - Mobile & Tablet (< lg): Layout Compact & Proporsional (Grid 2 kolom di tablet, kartu kompak di mobile).
  * - PC/Laptop (lg+): 3-Kolom (Sisi Kiri Headline — Tengah Foto Potret 3:4 — Sisi Kanan Narasi & CTA).
  */
-function Hero({ product }) {
+/** Teks yang muncul memudar setiap kali `id` berganti (dipakai untuk judul dan keterangan foto). */
+function Swap({ id, className, children }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.span
+      key={id}
+      className={className}
+      initial={reduce ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.7, ease: 'easeOut' }}
+    >
+      {children}
+    </motion.span>
+  );
+}
+
+/** Semua foto hero ditumpuk; hanya yang aktif yang terlihat, sisanya memudar. */
+function HeroImages({ slides, index, className = '' }) {
+  return slides.map((slide, slideIndex) => (
+    <img
+      key={slide.product.id}
+      src={imageOf(slide.product.image_url)}
+      alt={slideIndex === index ? slide.product.name : ''}
+      aria-hidden={slideIndex === index ? undefined : true}
+      className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-in-out motion-reduce:transition-none ${
+        slideIndex === index ? 'opacity-100' : 'opacity-0'
+      } ${className}`}
+    />
+  ));
+}
+
+function Hero({ slides }) {
+  const reduce = useReducedMotion();
+  const [current, setCurrent] = useState(0);
+  const count = slides.length;
+
+  // Berganti sendiri tiap 10 detik. Tidak ada tombol geser; berhenti sementara bila tab tidak dilihat.
+  useEffect(() => {
+    if (count < 2) return undefined;
+    const timer = setInterval(() => {
+      if (!document.hidden) setCurrent((value) => (value + 1) % count);
+    }, HERO_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [count]);
+
+  const index = count ? current % count : 0;
+  const product = slides[index]?.product;
+  const lines = (slides[index]?.headline || HERO_DEFAULT_HEADLINE).lines;
+
   return (
     <section className="border-b border-cream-300 bg-cream-100">
       <div className="container-page py-6 sm:py-10 lg:py-20">
@@ -69,15 +167,12 @@ function Hero({ product }) {
                 to={`/produk/${product.id}`}
                 className="group relative mx-auto block aspect-[4/5] max-w-xs overflow-hidden border border-cream-300 bg-cream-200 md:aspect-[3/4] md:max-w-none"
               >
-                <img
-                  src={imageOf(product.image_url)}
-                  alt={product.name}
-                  className="h-full w-full object-cover"
-                />
+                <HeroImages slides={slides} index={index} />
                 <span className="absolute left-3 top-3 border border-cream-200/60 bg-charcoal/70 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-eyebrow text-cream-100 backdrop-blur-[2px]">
                   100% Autentik
                 </span>
-                <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-charcoal/80 via-charcoal/30 to-transparent p-4 text-cream-100">
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-charcoal/80 via-charcoal/30 to-transparent p-4 text-cream-100">
+                  <Swap id={index} className="flex items-end justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] uppercase tracking-eyebrow text-cream-200">
                       {product.store_name || "Karya Pilihan"}
@@ -89,6 +184,7 @@ function Hero({ product }) {
                   <span className="shrink-0 text-xs font-bold text-cream-100">
                     {rupiah(product.price)}
                   </span>
+                  </Swap>
                 </div>
               </Link>
             ) : (
@@ -106,22 +202,24 @@ function Hero({ product }) {
 
           <div className="space-y-4 md:col-span-7 md:pl-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="eyebrow">Edisi Kurasi — Papua</p>
+              <p className="eyebrow">Edisi Produk Pilihan — Papua</p>
               <span className="text-[11px] font-medium text-charcoal-500">
                 {product?.origin_region || product?.store_city || "Tanah Papua"}
               </span>
             </div>
 
             <h1 className="font-display text-3xl font-light leading-[1.08] tracking-tight text-charcoal sm:text-4xl">
-              Dianyam dengan{" "}
-              <span className="font-display text-[1.04em] font-normal text-charcoal">
-                tangan.
-              </span>
+              <Swap id={index} className="block">
+                {lines[0]} {lines[1]}{" "}
+                <span className="font-display text-[1.04em] font-normal text-charcoal">
+                  {lines[2]}
+                </span>
+              </Swap>
             </h1>
 
             <p className="text-xs leading-relaxed text-charcoal-600 sm:text-sm">
               Setiap serat kayu, pintalan benang, dan motif ukiran menyimpan
-              jejak tradisi pengrajin Papua—dikurasi langsung dari komunitas
+              jejak tradisi pengrajin Papua— Produk Pilihan langsung dari komunitas
               lokal untuk keseharian modern.
             </p>
 
@@ -135,7 +233,7 @@ function Hero({ product }) {
             <div className="grid grid-cols-2 gap-3 border-t border-cream-300 pt-3">
               <div>
                 <p className="font-display text-sm font-bold uppercase tracking-wider text-charcoal">
-                  Kurasi
+                  Produk Pilihan
                 </p>
                 <p className="text-[11px] text-charcoal-500">
                   Pengrajin Terverifikasi
@@ -158,7 +256,7 @@ function Hero({ product }) {
           {/* Sisi Kiri: Identitas & Headline Utama */}
           <div className="flex flex-col justify-between space-y-6 lg:min-h-[500px] lg:py-4">
             <div>
-              <p className="eyebrow">Edisi Kurasi — Papua</p>
+              <p className="eyebrow">Edisi Produk Pilihan — Papua</p>
               <p className="mt-1 text-xs font-medium text-charcoal-400">
                 Lookbook Koleksi Pengrajin
               </p>
@@ -166,13 +264,28 @@ function Hero({ product }) {
 
             <div>
               <h1 className="font-display text-5xl font-light leading-[1.04] tracking-tight text-charcoal xl:text-6xl">
-                Dianyam <br />
-                dengan <br />
-                <span className="font-display text-[1.04em] font-normal text-charcoal">
-                  tangan.
-                </span>
+                <Swap id={index} className="block">
+                  {lines[0]} <br />
+                  {lines[1]} <br />
+                  <span className="font-display text-[1.04em] font-normal text-charcoal">
+                    {lines[2]}
+                  </span>
+                </Swap>
               </h1>
-              <div className="mt-6 h-px w-16 bg-charcoal" />
+              {/* Garis ini terisi selama 10 detik sebagai penanda pergantian gambar. */}
+              {count > 1 && !reduce ? (
+                <div className="mt-6 h-px w-16 bg-cream-300">
+                  <motion.div
+                    key={index}
+                    className="h-px w-full origin-left bg-charcoal"
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{ duration: HERO_INTERVAL_MS / 1000, ease: 'linear' }}
+                  />
+                </div>
+              ) : (
+                <div className="mt-6 h-px w-16 bg-charcoal" />
+              )}
             </div>
 
             <div>
@@ -194,12 +307,9 @@ function Hero({ product }) {
                 to={`/produk/${product.id}`}
                 className="group relative block aspect-[3/4] w-full overflow-hidden border border-cream-300 bg-cream-200"
               >
-                <img
-                  src={imageOf(product.image_url)}
-                  alt={product.name}
-                  className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
-                />
-                <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 bg-gradient-to-t from-charcoal/75 via-charcoal/25 to-transparent p-5 text-cream-100">
+                <HeroImages slides={slides} index={index} />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-charcoal/75 via-charcoal/25 to-transparent p-5 text-cream-100">
+                  <Swap id={index} className="flex items-end justify-between gap-4">
                   <div className="min-w-0">
                     <p className="text-[10px] uppercase tracking-eyebrow text-cream-200">
                       {product.store_name || "Karya Pilihan"}
@@ -211,6 +321,7 @@ function Hero({ product }) {
                   <span className="shrink-0 text-xs font-bold text-cream-100">
                     {rupiah(product.price)}
                   </span>
+                  </Swap>
                 </div>
               </Link>
             ) : (
@@ -238,7 +349,7 @@ function Hero({ product }) {
               <p className="eyebrow">Filosofi Karya</p>
               <p className="mt-3 text-sm leading-relaxed text-charcoal-600">
                 Setiap serat kayu, pintalan benang, dan motif ukiran menyimpan
-                jejak tradisi pengrajin Papua—dikurasi langsung dari komunitas
+                jejak tradisi pengrajin Papua—Produk Pilihan langsung dari komunitas
                 lokal untuk keseharian modern.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-6 lg:justify-end">
@@ -252,7 +363,7 @@ function Hero({ product }) {
             <div className="grid grid-cols-2 gap-4 border-t border-cream-300 pt-5 text-left lg:text-right">
               <div>
                 <p className="font-display text-xl font-bold text-charcoal">
-                  Kurasi
+                  Produk Pilihan
                 </p>
                 <p className="mt-0.5 text-[11px] text-charcoal-500">
                   Pengrajin Terverifikasi
@@ -330,7 +441,7 @@ const PROMISES = [
     icon: HandHeart,
     num: '01',
     title: 'Dibuat dengan tangan',
-    text: 'Setiap toko dikelola langsung oleh pengrajin atau UMKM lokal Papua yang telah melalui proses verifikasi kurasi admin.',
+    text: 'Setiap toko dikelola langsung oleh pengrajin atau UMKM lokal Papua yang telah melalui proses verifikasi Produk Pilihan admin.',
   },
   {
     icon: ShoppingBag,
@@ -364,7 +475,7 @@ const PROMISES = [
   },
 ];
 
-/** Section Standar Kurasi dengan 6 kartu yang berjalan looping terus-menerus ke arah kanan. */
+/** Section Standar Produk Pilihan dengan 6 kartu yang berjalan looping terus-menerus ke arah kanan. */
 function PromisesMarquee() {
   const loopItems = [...PROMISES, ...PROMISES];
 
@@ -372,7 +483,7 @@ function PromisesMarquee() {
     <section className="overflow-hidden border-t border-cream-300 bg-cream-100 py-14 md:py-24">
       <div className="container-page mb-10 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">Standar Kurasi</p>
+          <p className="eyebrow">Standar Produk Pilihan</p>
           <h2 className="mt-1.5 font-display text-2xl font-light tracking-tight text-charcoal sm:text-4xl">
             Komitmen pada{' '}
             <span className="font-serif text-[1.08em] font-normal italic text-charcoal">keaslian &amp; kualitas</span>
@@ -428,9 +539,9 @@ export default function Home() {
   const state = useAsync(loadHome, []);
   return (
     <DataState state={state}>
-      {({ latest, best, categories, stores }) => (
+      {({ latest, best, categories, stores, heroSlides }) => (
         <>
-          <Hero product={latest[0]} />
+          <Hero slides={heroSlides} />
           <Editorial products={latest.slice(1, 4).length >= 3 ? latest.slice(1, 4) : latest.slice(0, 3)} />
 
           <section className="container-page py-14 md:py-24">
@@ -475,7 +586,7 @@ export default function Home() {
 
           {best.length > 0 && (
             <section className="container-page py-14 md:py-24">
-              <SectionHead eyebrow="Kurasi Terpopuler" title="Paling banyak" accent="diminati" to="/produk?urut=bestseller" linkLabel="Lihat terlaris" />
+              <SectionHead eyebrow="Produk Pilihan Terpopuler" title="Paling banyak" accent="diminati" to="/produk?urut=bestseller" linkLabel="Lihat terlaris" />
               <ProductTileGrid products={best} />
             </section>
           )}

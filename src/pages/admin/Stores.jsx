@@ -149,7 +149,7 @@ export default function AdminStores() {
   return (
     <>
       <PageHeader
-        eyebrow="Kurasi Pengrajin"
+        eyebrow="Produk Pilihan Pengrajin"
         title="Verifikasi toko"
         description="Tinjau dan verifikasi profil toko pengrajin sebelum karya mereka ditayangkan di katalog publik."
       />

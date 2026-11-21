@@ -46,7 +46,7 @@ export default function Footer() {
           <div className="lg:col-span-5">
             <Logo light />
             <p className="mt-5 max-w-sm text-sm leading-relaxed text-cream-300/80">
-              Ruang kurasi digital tempat pengrajin dan UMKM Papua menghadirkan noken, aksesoris, ukiran, serta kriya tangan autentik langsung kepada apresiator di seluruh Indonesia.
+              Ruang Produk Pilihan digital tempat pengrajin dan UMKM Papua menghadirkan noken, aksesoris, ukiran, serta kriya tangan autentik langsung kepada apresiator di seluruh Indonesia.
             </p>
             <div className="mt-6 flex items-center gap-2 text-xs text-cream-300/70">
               <MapPin className="h-3.5 w-3.5 shrink-0 text-earth-300" strokeWidth={1.5} />

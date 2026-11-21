@@ -392,7 +392,7 @@ export default function Catalog() {
           >
             <div className="flex items-center justify-between border-b border-cream-300 bg-white px-6 py-5">
               <div>
-                <p className="text-[10px] uppercase tracking-eyebrow text-earth-500">Kurasi</p>
+                <p className="text-[10px] uppercase tracking-eyebrow text-earth-500">Produk Pilihan</p>
                 <h2 className="font-display text-base font-medium uppercase tracking-wider text-charcoal">
                   Filter Koleksi {activeCount > 0 ? `(${activeCount})` : ''}
                 </h2>
