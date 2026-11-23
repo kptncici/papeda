@@ -1,6 +1,6 @@
 /**
  * Ornamen latar hero (bayang-bayang, bukan gambar utama):
- * - Pita ornamen ombak di dasar hero
+ * - Pita ornamen ombak di atas (bawah navbar) dan di dasar hero
  * Semua digambar ulang sebagai SVG dari gambar referensi. Warna mengikuti `currentColor`,
  * jadi tingkat samar cukup diatur lewat kelas opacity.
  */
@@ -24,6 +24,14 @@ function Shape({ shape, className = '', style }) {
 export default function HeroOrnaments() {
   return (
     <div className="pointer-events-none absolute inset-0 -z-10 select-none text-charcoal" aria-hidden="true">
+      {/* Pita ombak di atas hero (tepat di bawah navbar), dicerminkan ke atas supaya
+          berpasangan dengan pita bawah dan membingkai isi hero. */}
+      <div className="absolute inset-x-0 top-0 hidden justify-center opacity-[0.06] lg:flex">
+        {Array.from({ length: 10 }, (_, i) => (
+          <Shape key={i} shape={BAND_WAVE} className="h-12 w-auto shrink-0" style={{ transform: 'scaleY(-1)' }} />
+        ))}
+      </div>
+
       {/* Pita ombak memanjang di dasar hero, diulang supaya selebar layar. */}
       <div className="absolute inset-x-0 bottom-0 hidden justify-center opacity-[0.06] lg:flex">
         {Array.from({ length: 10 }, (_, i) => (
