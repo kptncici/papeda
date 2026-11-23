@@ -5,6 +5,7 @@ import { ArrowUpRight, Compass, HandHeart, ShieldCheck, ShoppingBag, Sparkles, S
 import { useAsync } from '../../hooks/useAsync';
 import { searchProducts, listCategories, listStores } from '../../services/catalog';
 import { ProductTileGrid } from '../../components/ProductCard';
+import HeroOrnaments from '../../components/HeroOrnaments';
 import { DataState, EmptyState } from '../../components/ui/Feedback';
 import { imageOf, rupiah } from '../../utils/format';
 
@@ -157,7 +158,9 @@ function Hero({ slides }) {
   const lines = (slides[index]?.headline || HERO_DEFAULT_HEADLINE).lines;
 
   return (
-    <section className="border-b border-cream-300 bg-cream-100">
+    <section className="relative isolate overflow-hidden border-b border-cream-300 bg-cream-100">
+      {/* Ornamen Papua samar di latar (burung cenderawasih + motif ukiran). */}
+      <HeroOrnaments />
       <div className="container-page py-6 sm:py-10 lg:py-20">
         {/* TAMPILAN COMPACT KHUSUS MOBILE & TABLET (< lg) */}
         <div className="grid items-center gap-6 md:grid-cols-12 lg:hidden">
